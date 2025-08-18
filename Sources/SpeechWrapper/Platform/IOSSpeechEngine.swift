@@ -50,13 +50,23 @@ final class IOSSpeechEngine: TranscriptionEngine {
         }
         tasks.append(rTask)
 
-        // audio feeding placeholder
+        // audio feeding: convert Float32 mono samples to AVAudioPCMBuffer
         let fTask = Task { [weak self] in
             guard let self, let builder = self.inputBuilder else { return }
-            for await _ in input {
+            for await chunk in input {
                 if Task.isCancelled { break }
-                // Future: convert AudioChunk -> AVAudioPCMBuffer and yield
-                // builder.yield(AnalyzerInput(buffer: buffer))
+                let bytes = chunk.bytes
+                let frames = bytes.count / MemoryLayout<Float>.size
+                guard frames > 0 else { continue }
+
+                let format = AVAudioFormat(standardFormatWithSampleRate: chunk.sampleRate, channels: 1)!
+                guard let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else { continue }
+                pcm.frameLength = AVAudioFrameCount(frames)
+                bytes.withUnsafeBytes { raw in
+                    guard let src = raw.bindMemory(to: Float.self).baseAddress else { return }
+                    pcm.floatChannelData![0].assign(from: src, count: frames)
+                }
+                builder.yield(AnalyzerInput(buffer: pcm))
             }
             builder.finish()
         }
@@ -108,4 +118,3 @@ extension IOSSpeechEngine: @unchecked Sendable {}
 extension IOSAssetManager: @unchecked Sendable {}
 
 #endif
-

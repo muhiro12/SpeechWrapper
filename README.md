@@ -10,7 +10,8 @@ Thin, testable facade for on-device speech-to-text using Apple’s latest Speech
 ```swift
 import SpeechWrapper
 
-let service = TranscriptionService(audioInput: YourAudioInput())
+// Simplest: use built-in microphone input
+let service = TranscriptionService.usingMicrophone()
 
 // 1) One-shot (async/await): waits for first final result
 let final: TranscriptionResult = try await service.transcribeOnce()

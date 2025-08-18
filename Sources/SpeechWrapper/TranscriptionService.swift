@@ -21,6 +21,12 @@ public actor TranscriptionService {
         self.assets = PlatformDefaults.makeAssets()
     }
 
+    /// Factory: Service configured with built-in microphone input on iOS 26+.
+    /// - Note: Falls back to a no-op input outside supported platforms.
+    public static func usingMicrophone() -> TranscriptionService {
+        TranscriptionService(audioInput: PlatformDefaults.makeDefaultAudioInput())
+    }
+
     /// Internal initializer for DI（ユニットテスト用）。
     init(audioInput: any AudioInput, engine: any TranscriptionEngine, assets: any AssetManaging) {
         self.audioInput = audioInput
@@ -29,7 +35,7 @@ public actor TranscriptionService {
     }
 
     /// Returns a stream of transcription results. Subscribe before or after `start()`.
-    func resultStream() -> AsyncStream<TranscriptionResult> {
+    public func resultStream() -> AsyncStream<TranscriptionResult> {
         let id = UUID()
         return AsyncStream { continuation in
             subscribers[id] = continuation
@@ -80,7 +86,7 @@ public actor TranscriptionService {
     }
 
     /// Start transcription pipeline.
-    func start() async throws {
+    public func start() async throws {
         if isRunning { throw TranscriptionError.alreadyRunning }
         guard await prepareAssetsIfNeeded() else { throw TranscriptionError.modelUnavailable }
 
@@ -149,5 +155,14 @@ enum PlatformDefaults {
         }
         #endif
         return NoopAssets()
+    }
+
+    static func makeDefaultAudioInput() -> any AudioInput {
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return MicrophoneInput()
+        }
+        #endif
+        return NoopMicrophone()
     }
 }
