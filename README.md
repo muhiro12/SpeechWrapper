@@ -1,12 +1,12 @@
 # SpeechWrapper
 
-iOS 26+ の最新 Speech フレームワーク（SpeechAnalyzer, SpeechTranscriber, AssetInventory）を用いた、オンデバイス音声→テキストの薄いファサードです。依存はプロトコルで抽象化し、ユニットテストはモックで完結します。
+Thin, testable facade for on-device speech-to-text using Apple’s latest Speech framework modules on iOS 26+: SpeechAnalyzer, SpeechTranscriber, and AssetInventory. Dependencies are abstracted via protocols and unit tests run with mocks (no mic/device required).
 
-## 対応環境
-- iOS 26 以降
+## Requirements
+- iOS 26+
 - Swift 6 / Xcode 26
 
-## 使い方（最小）
+## Minimal Usage
 ```swift
 import SpeechWrapper
 
@@ -18,22 +18,27 @@ let stream = await service.resultStream()
 Task { for await r in stream { print(r.text, r.isFinal) } }
 
 try await service.start()
-// ... 必要に応じて停止
+// ... later
 await service.stop()
 ```
 
-## 必要権限（アプリ側）
+## App Permissions
 - `NSMicrophoneUsageDescription`
 
-## ビルド / テスト
-- ビルド: `swift build`
-- テスト: `swift test`
+## Build & Test
+- Build (iOS Simulator):
+  - `xcodebuild -scheme SpeechWrapper -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=26.0' build`
+- Test (iOS Simulator):
+  - `xcodebuild -scheme SpeechWrapper -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=26.0' -only-testing:SpeechWrapperTests test`
 
-## 既知の制限
-- ロケールやモデル選択など高度なオプションは未公開（将来拡張）。
-- iOS 実装は SpeechAnalyzer + SpeechTranscriber + AssetInventory を参照。非 iOS 環境では No-op 実装を使用します（テストはモック注入）。
+Note: This package targets iOS only; running `swift test` on macOS is not supported.
 
-## 参考資料
+## Known Limitations
+- Advanced options (locale/model selection) are not exposed yet.
+- iOS-only implementation wires SpeechAnalyzer + SpeechTranscriber + AssetInventory; non‑iOS builds rely on no-op engine and dependency injection for tests.
+- Audio feeding uses an abstraction; converting `AudioChunk` to `AVAudioPCMBuffer` is left to concrete audio input implementations.
+
+## References
 - https://developer.apple.com/documentation/speech
 - https://developer.apple.com/documentation/speech/speechanalyzer
 - https://developer.apple.com/documentation/speech/speechtranscriber
