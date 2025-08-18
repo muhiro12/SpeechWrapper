@@ -2,44 +2,81 @@ import Foundation
 
 #if os(iOS) && canImport(Speech)
 import Speech
+import AVFoundation
 
 @available(iOS 26, *)
 final class IOSSpeechEngine: TranscriptionEngine {
-    // Intentionally keep usage conservative to compile against iOS 26 SDK.
-    // Keep references typed loosely; concrete wiring may vary by SDK.
-    private var analyzerRef: Any?
-    private var transcriberRef: Any?
+    private var analyzer: SpeechAnalyzer?
+    private var transcriber: SpeechTranscriber?
+    private var inputSequence: AsyncStream<AnalyzerInput>?
+    private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
+    private var tasks: [Task<Void, Never>] = []
 
-    private var resultsStream: AsyncStream<TranscriptionResult>!
-    private var continuation: AsyncStream<TranscriptionResult>.Continuation!
+    private let resultsStream: AsyncStream<TranscriptionResult>
+    private let continuation: AsyncStream<TranscriptionResult>.Continuation
 
     init() {
-        let stream = AsyncStream<TranscriptionResult> { continuation in
-            self.continuation = continuation
-        }
-        self.resultsStream = stream
+        var c: AsyncStream<TranscriptionResult>.Continuation!
+        self.resultsStream = AsyncStream { cont in c = cont }
+        self.continuation = c
     }
 
     var results: AsyncStream<TranscriptionResult> { resultsStream }
 
     func start(with input: AsyncStream<AudioChunk>) async throws {
-        // NOTE: Minimal placeholder wiring. Real processing is expected to feed
-        // bytes into SpeechAnalyzer and consume SpeechTranscriber outputs.
-        // This placeholder forwards no results but validates integration points.
-        _ = input // suppress unused in placeholder
+        let transcriber = SpeechTranscriber(locale: .current,
+                                            transcriptionOptions: [],
+                                            reportingOptions: [.volatileResults],
+                                            attributeOptions: [])
+        self.transcriber = transcriber
+        self.analyzer = SpeechAnalyzer(modules: [transcriber])
 
-        // Ensure types are linked without constraining initializer choices.
-        // Referencing types keeps the binary linked with Speech modules.
-        _ = SpeechAnalyzer.self
-        _ = SpeechTranscriber.self
-        analyzerRef = nil
-        transcriberRef = nil
+        let pair = AsyncStream<AnalyzerInput>.makeStream()
+        self.inputSequence = pair.stream
+        self.inputBuilder = pair.continuation
+
+        // results forwarding
+        let rTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                for try await result in transcriber.results {
+                    let text = result.text
+                    let isFinal = result.isFinal
+                    self.continuation.yield(.init(text: String(text.characters), isFinal: isFinal))
+                }
+            } catch {
+                // ignore for now
+            }
+        }
+        tasks.append(rTask)
+
+        // audio feeding placeholder
+        let fTask = Task { [weak self] in
+            guard let self, let builder = self.inputBuilder else { return }
+            for await _ in input {
+                if Task.isCancelled { break }
+                // Future: convert AudioChunk -> AVAudioPCMBuffer and yield
+                // builder.yield(AnalyzerInput(buffer: buffer))
+            }
+            builder.finish()
+        }
+        tasks.append(fTask)
+
+        if let seq = self.inputSequence {
+            try await analyzer?.start(inputSequence: seq)
+        }
     }
 
     func stop() async {
-        continuation?.finish()
-        analyzerRef = nil
-        transcriberRef = nil
+        inputBuilder?.finish()
+        try? await analyzer?.finalizeAndFinishThroughEndOfInput()
+        tasks.forEach { $0.cancel() }
+        tasks.removeAll(keepingCapacity: false)
+        continuation.finish()
+        analyzer = nil
+        transcriber = nil
+        inputSequence = nil
+        inputBuilder = nil
     }
 }
 
@@ -47,13 +84,21 @@ final class IOSSpeechEngine: TranscriptionEngine {
 final class IOSAssetManager: AssetManaging {
 
     func ensureAssetsAvailable() async -> Bool {
-        // Placeholder: assume available. Real implementation would check inventory.
-        return true
+        let current = Locale.current
+        let installed = await Set(SpeechTranscriber.installedLocales)
+        return installed.map { $0.identifier(.bcp47) }.contains(current.identifier(.bcp47))
     }
 
     func installIfNeeded() async throws -> Bool {
-        // Placeholder: assume success. Real implementation would trigger install via AssetInventory APIs.
-        return true
+        let transcriber = SpeechTranscriber(locale: .current,
+                                            transcriptionOptions: [],
+                                            reportingOptions: [],
+                                            attributeOptions: [])
+        if let downloader = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            try await downloader.downloadAndInstall()
+            return true
+        }
+        return false
     }
 }
 
