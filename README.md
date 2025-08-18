@@ -1,4 +1,4 @@
-# SpeechTranscriptionKit
+# SpeechWrapper
 
 iOS 26+ の最新 Speech フレームワーク（SpeechAnalyzer, SpeechTranscriber, AssetInventory）を用いた、オンデバイス音声→テキストの薄いファサードです。依存はプロトコルで抽象化し、ユニットテストはモックで完結します。
 
@@ -8,7 +8,7 @@ iOS 26+ の最新 Speech フレームワーク（SpeechAnalyzer, SpeechTranscrib
 
 ## 使い方（最小）
 ```swift
-import SpeechTranscriptionKit
+import SpeechWrapper
 
 let service = TranscriptionService(
   audioInput: YourAudioInput()

@@ -1,16 +1,25 @@
 // swift-tools-version: 6.2
+// The swift-tools-version declares the minimum version of Swift required to build this package.
 import PackageDescription
 
 let package = Package(
-    name: "SpeechTranscriptionKit",
+    name: "SpeechWrapper",
     platforms: [
         .iOS(.v26)
     ],
     products: [
-        .library(name: "SpeechTranscriptionKit", targets: ["SpeechTranscriptionKit"])
+        .library(
+            name: "SpeechWrapper",
+            targets: ["SpeechWrapper"]
+        ),
     ],
     targets: [
-        .target(name: "SpeechTranscriptionKit"),
-        .testTarget(name: "SpeechTranscriptionKitTests", dependencies: ["SpeechTranscriptionKit"])
+        .target(
+            name: "SpeechWrapper"
+        ),
+        .testTarget(
+            name: "SpeechWrapperTests",
+            dependencies: ["SpeechWrapper"]
+        ),
     ]
 )

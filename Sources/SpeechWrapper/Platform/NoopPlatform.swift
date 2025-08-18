@@ -23,3 +23,4 @@ final class NoopAssets: AssetManaging {
 
 extension NoopEngine: @unchecked Sendable {}
 extension NoopAssets: @unchecked Sendable {}
+

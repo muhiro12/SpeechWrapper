@@ -1,5 +1,5 @@
 import XCTest
-@testable import SpeechTranscriptionKit
+@testable import SpeechWrapper
 
 // MARK: - Test Doubles
 
