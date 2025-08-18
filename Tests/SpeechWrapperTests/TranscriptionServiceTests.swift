@@ -84,6 +84,25 @@ extension MockAssetsManager: @unchecked Sendable {}
 
 @available(iOS 26, *)
 final class TranscriptionServiceTests: XCTestCase {
+    func testTranscribeOnceReturnsFinal() async throws {
+        let input = MockAudioInput()
+        let engine = MockEngine()
+        let assets = MockAssetsManager(available: true, installSucceeds: true)
+        let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
+
+        let t = Task { try await service.transcribeOnce() }
+        // Give service a moment to start and subscribe
+        await Task.yield()
+        engine.emit(.init(text: "hello", isFinal: false))
+        engine.emit(.init(text: "hello world", isFinal: true))
+
+        let final = try await t.value
+        XCTAssertEqual(final, .init(text: "hello world", isFinal: true))
+        // Ensure stop cleaned up
+        await service.stop()
+        XCTAssertTrue(engine.stopped)
+        XCTAssertTrue(input.stopped)
+    }
     func testSequenceInterimFinalStop() async throws {
         let input = MockAudioInput()
         let engine = MockEngine()

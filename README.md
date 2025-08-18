@@ -6,18 +6,19 @@ Thin, testable facade for on-device speech-to-text using Apple’s latest Speech
 - iOS 26+
 - Swift 6 / Xcode 26
 
-## Minimal Usage
+## Minimal Usage (Public API)
 ```swift
 import SpeechWrapper
 
-let service = TranscriptionService(
-  audioInput: YourAudioInput()
-)
+let service = TranscriptionService(audioInput: YourAudioInput())
 
-let stream = await service.resultStream()
+// 1) One-shot (async/await): waits for first final result
+let final: TranscriptionResult = try await service.transcribeOnce()
+print(final.text)
+
+// 2) Streaming (AsyncStream): get real-time partial/final results
+let stream = try await service.startStreaming()
 Task { for await r in stream { print(r.text, r.isFinal) } }
-
-try await service.start()
 // ... later
 await service.stop()
 ```
@@ -31,7 +32,7 @@ await service.stop()
 - Test (iOS Simulator):
   - `xcodebuild -scheme SpeechWrapper -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=26.0' -only-testing:SpeechWrapperTests test`
 
-Note: This package targets iOS only; running `swift test` on macOS is not supported.
+Note: The public API focuses on two clear entry points: `transcribeOnce()` and `startStreaming()`/`stop()`. Internal helpers like `start()` and `resultStream()` are not exposed.
 
 ## Known Limitations
 - Advanced options (locale/model selection) are not exposed yet.

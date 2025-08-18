@@ -29,7 +29,7 @@ public actor TranscriptionService {
     }
 
     /// Returns a stream of transcription results. Subscribe before or after `start()`.
-    public func resultStream() -> AsyncStream<TranscriptionResult> {
+    func resultStream() -> AsyncStream<TranscriptionResult> {
         let id = UUID()
         return AsyncStream { continuation in
             subscribers[id] = continuation
@@ -39,6 +39,28 @@ public actor TranscriptionService {
         }
     }
 
+    /// Convenience: Start streaming and return the results stream.
+    /// Call `stop()` when you no longer need results.
+    public func startStreaming() async throws -> AsyncStream<TranscriptionResult> {
+        let stream = resultStream()
+        try await start()
+        return stream
+    }
+
+    /// One-shot transcription: Starts, waits for the first final result, then stops.
+    /// - Returns: The first final `TranscriptionResult` observed.
+    public func transcribeOnce() async throws -> TranscriptionResult {
+        if isRunning { throw TranscriptionError.alreadyRunning }
+        let stream = resultStream()
+        try await start()
+        defer { Task { await self.stop() } }
+
+        for await r in stream {
+            if r.isFinal { return r }
+        }
+        throw TranscriptionError.transcriberFailed
+    }
+
     private func removeSubscriber(_ id: UUID) {
         subscribers.removeValue(forKey: id)
     }
@@ -46,7 +68,7 @@ public actor TranscriptionService {
     /// Ensures necessary on-device assets are available, attempting installation if missing.
     /// - Returns: true if assets are available after this call.
     @discardableResult
-    public func prepareAssetsIfNeeded() async -> Bool {
+    func prepareAssetsIfNeeded() async -> Bool {
         if await assets.ensureAssetsAvailable() { return true }
         do {
             let ok = try await assets.installIfNeeded()
@@ -58,7 +80,7 @@ public actor TranscriptionService {
     }
 
     /// Start transcription pipeline.
-    public func start() async throws {
+    func start() async throws {
         if isRunning { throw TranscriptionError.alreadyRunning }
         guard await prepareAssetsIfNeeded() else { throw TranscriptionError.modelUnavailable }
 
