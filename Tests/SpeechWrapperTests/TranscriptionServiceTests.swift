@@ -91,9 +91,13 @@ final class TranscriptionServiceTests: XCTestCase {
         let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
 
         let stream = await service.resultStream()
+        // Collect exactly two results to avoid timing races with stop().
         let collector = Task { () -> [TranscriptionResult] in
             var arr: [TranscriptionResult] = []
-            for await r in stream { arr.append(r) }
+            for await r in stream {
+                arr.append(r)
+                if arr.count == 2 { break }
+            }
             return arr
         }
 
@@ -104,8 +108,8 @@ final class TranscriptionServiceTests: XCTestCase {
         engine.emit(.init(text: "hello", isFinal: false))
         engine.emit(.init(text: "hello world", isFinal: true))
 
-        await service.stop()
         let results = await collector.value
+        await service.stop()
 
         XCTAssertTrue(engine.stopped)
         XCTAssertTrue(input.stopped)

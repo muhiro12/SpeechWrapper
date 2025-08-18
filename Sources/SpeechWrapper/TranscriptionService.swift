@@ -88,10 +88,13 @@ public actor TranscriptionService {
     public func stop() async {
         guard isRunning else { return }
         isRunning = false
-        forwarderTask?.cancel()
-        forwarderTask = nil
+        // First, stop engine to naturally end the results stream.
         await engine.stop()
         await audioInput.stop()
+        // Give the forwarder a chance to drain any final items.
+        await Task.yield()
+        forwarderTask?.cancel()
+        forwarderTask = nil
         finishAll()
     }
 
@@ -126,4 +129,3 @@ enum PlatformDefaults {
         return NoopAssets()
     }
 }
-
