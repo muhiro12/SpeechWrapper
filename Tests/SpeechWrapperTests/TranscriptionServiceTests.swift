@@ -1,4 +1,4 @@
-import XCTest
+import Testing
 @testable import SpeechWrapper
 
 // MARK: - Test Doubles
@@ -45,10 +45,7 @@ final class MockEngine: TranscriptionEngine {
 
     func start(with input: AsyncStream<AudioChunk>) async throws {
         started = true
-        // Drive results asynchronously to simulate interim and final outputs
-        Task {
-            for await _ in input { /* ignore */ }
-        }
+        Task { for await _ in input { /* ignore */ } }
     }
 
     func stop() async { stopped = true; continuation.finish() }
@@ -80,92 +77,102 @@ extension MockEngine: @unchecked Sendable {}
 @available(iOS 26, *)
 extension MockAssetsManager: @unchecked Sendable {}
 
-// MARK: - Tests
+// MARK: - Tests (Swift Testing)
 
 @available(iOS 26, *)
-final class TranscriptionServiceTests: XCTestCase {
-    func testTranscribeOnceReturnsFinal() async throws {
-        let input = MockAudioInput()
-        let engine = MockEngine()
-        let assets = MockAssetsManager(available: true, installSucceeds: true)
-        let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
+@Test func streaming_twoResults_then_stop() async throws {
+    let input = MockAudioInput()
+    let engine = MockEngine()
+    let assets = MockAssetsManager(available: true, installSucceeds: true)
+    let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
 
-        let t = Task { try await service.transcribeOnce() }
-        // Give service a moment to start and subscribe
-        await Task.yield()
-        engine.emit(.init(text: "hello", isFinal: false))
-        engine.emit(.init(text: "hello world", isFinal: true))
+    let stream = try await service.startStreaming()
+    #expect(engine.started)
+    #expect(input.started)
 
-        let final = try await t.value
-        XCTAssertEqual(final, .init(text: "hello world", isFinal: true))
-        // Ensure stop cleaned up
-        await service.stop()
-        XCTAssertTrue(engine.stopped)
-        XCTAssertTrue(input.stopped)
-    }
-    func testSequenceInterimFinalStop() async throws {
-        let input = MockAudioInput()
-        let engine = MockEngine()
-        let assets = MockAssetsManager(available: true, installSucceeds: true)
-        let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
-
-        let stream = await service.resultStream()
-        // Collect exactly two results to avoid timing races with stop().
-        let collector = Task { () -> [TranscriptionResult] in
-            var arr: [TranscriptionResult] = []
-            for await r in stream {
-                arr.append(r)
-                if arr.count == 2 { break }
-            }
-            return arr
+    let collector = Task { () -> [TranscriptionResult] in
+        var arr: [TranscriptionResult] = []
+        for await r in stream {
+            arr.append(r)
+            if arr.count == 2 { break }
         }
-
-        try await service.start()
-        XCTAssertTrue(engine.started)
-        XCTAssertTrue(input.started)
-
-        engine.emit(.init(text: "hello", isFinal: false))
-        engine.emit(.init(text: "hello world", isFinal: true))
-
-        let results = await collector.value
-        await service.stop()
-
-        XCTAssertTrue(engine.stopped)
-        XCTAssertTrue(input.stopped)
-        XCTAssertEqual(results.count, 2)
-        XCTAssertEqual(results[0], .init(text: "hello", isFinal: false))
-        XCTAssertEqual(results[1], .init(text: "hello world", isFinal: true))
+        return arr
     }
 
-    func testAssetsInstallRetrySuccess() async throws {
-        let input = MockAudioInput()
-        let engine = MockEngine()
-        let assets = MockAssetsManager(available: false, installSucceeds: true)
-        let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
+    engine.emit(.init(text: "hello", isFinal: false))
+    engine.emit(.init(text: "hello world", isFinal: true))
 
-        // First attempt: not available, but prepare will install
-        let prepared = await service.prepareAssetsIfNeeded()
-        XCTAssertTrue(prepared)
-        XCTAssertEqual(assets.installCount, 1)
+    let results = await collector.value
+    await service.stop()
 
-        // Now start should succeed
-        try await service.start()
-        await service.stop()
+    #expect(engine.stopped)
+    #expect(input.stopped)
+    #expect(results.count == 2)
+    #expect(results[0] == .init(text: "hello", isFinal: false))
+    #expect(results[1] == .init(text: "hello world", isFinal: true))
+}
+
+@available(iOS 26, *)
+@Test func assets_install_then_start_succeeds() async throws {
+    let input = MockAudioInput()
+    let engine = MockEngine()
+    let assets = MockAssetsManager(available: false, installSucceeds: true)
+    let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
+
+    _ = try await service.startStreaming()
+    await service.stop()
+
+    #expect(assets.installCount == 1)
+}
+
+@available(iOS 26, *)
+@Test func stop_is_idempotent() async throws {
+    let input = MockAudioInput()
+    let engine = MockEngine()
+    let assets = MockAssetsManager(available: true, installSucceeds: true)
+    let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
+
+    _ = try await service.startStreaming()
+    await service.stop()
+    await service.stop()
+
+    #expect(engine.stopped)
+    #expect(input.stopped)
+}
+
+@available(iOS 26, *)
+@Test func transcribeOnce_returns_final() async throws {
+    let input = MockAudioInput()
+    let engine = MockEngine()
+    let assets = MockAssetsManager(available: true, installSucceeds: true)
+    let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
+
+    let t = Task { try await service.transcribeOnce() }
+    await Task.yield()
+    engine.emit(.init(text: "hello", isFinal: false))
+    engine.emit(.init(text: "hello world", isFinal: true))
+
+    let final = try await t.value
+    #expect(final == .init(text: "hello world", isFinal: true))
+    await service.stop()
+    #expect(engine.stopped)
+    #expect(input.stopped)
+}
+
+@available(iOS 26, *)
+@Test func start_while_running_throws() async {
+    let input = MockAudioInput()
+    let engine = MockEngine()
+    let assets = MockAssetsManager(available: true, installSucceeds: true)
+    let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
+
+    _ = try? await service.startStreaming()
+    var thrown: Error?
+    do {
+        _ = try await service.startStreaming()
+    } catch {
+        thrown = error
     }
-
-    func testStopReleasesResources() async throws {
-        let input = MockAudioInput()
-        let engine = MockEngine()
-        let assets = MockAssetsManager(available: true, installSucceeds: true)
-        let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
-
-        try await service.start()
-        await service.stop()
-
-        // stopping again should be a no-op and not crash
-        await service.stop()
-
-        XCTAssertTrue(engine.stopped)
-        XCTAssertTrue(input.stopped)
-    }
+    #expect(thrown is TranscriptionError)
+    await service.stop()
 }
