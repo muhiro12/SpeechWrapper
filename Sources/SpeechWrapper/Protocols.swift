@@ -2,7 +2,7 @@ import Foundation
 
 /// Abstracts an audio input source (e.g., microphone, file reader).
 @available(iOS 26, *)
-public protocol AudioInput: Sendable {
+protocol AudioInput: Sendable {
     /// Start producing audio chunks.
     func start() async throws
     /// Stop producing audio chunks and release resources.
@@ -25,4 +25,3 @@ protocol AssetManaging: Sendable {
     /// Attempts to install missing assets. Returns true on success.
     func installIfNeeded() async throws -> Bool
 }
-

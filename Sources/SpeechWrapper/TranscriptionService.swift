@@ -3,7 +3,7 @@ import Foundation
 /// Actor-based facade providing a thin, clean API for speech-to-text.
 /// - Availability: iOS 26+
 @available(iOS 26, *)
-public actor TranscriptionService {
+actor TranscriptionService {
     private let audioInput: any AudioInput
     private let engine: any TranscriptionEngine
     private let assets: any AssetManaging
@@ -14,8 +14,8 @@ public actor TranscriptionService {
     // Multicast to subscribers
     private var subscribers: [UUID: AsyncStream<TranscriptionResult>.Continuation] = [:]
 
-    /// Public initializer usingプラットフォーム既定のエンジン/アセット。
-    public init(audioInput: any AudioInput) {
+    /// Initializer using プラットフォーム既定のエンジン/アセット。
+    init(audioInput: any AudioInput) {
         self.audioInput = audioInput
         self.engine = PlatformDefaults.makeEngine()
         self.assets = PlatformDefaults.makeAssets()
@@ -23,7 +23,7 @@ public actor TranscriptionService {
 
     /// Factory: Service configured with built-in microphone input on iOS 26+.
     /// - Note: Falls back to a no-op input outside supported platforms.
-    public static func usingMicrophone() -> TranscriptionService {
+    static func usingMicrophone() -> TranscriptionService {
         TranscriptionService(audioInput: PlatformDefaults.makeDefaultAudioInput())
     }
 
@@ -35,7 +35,7 @@ public actor TranscriptionService {
     }
 
     /// Returns a stream of transcription results. Subscribe before or after `start()`.
-    public func resultStream() -> AsyncStream<TranscriptionResult> {
+    func resultStream() -> AsyncStream<TranscriptionResult> {
         let id = UUID()
         return AsyncStream { continuation in
             subscribers[id] = continuation
@@ -47,7 +47,7 @@ public actor TranscriptionService {
 
     /// Convenience: Start streaming and return the results stream.
     /// Call `stop()` when you no longer need results.
-    public func startStreaming() async throws -> AsyncStream<TranscriptionResult> {
+    func startStreaming() async throws -> AsyncStream<TranscriptionResult> {
         let stream = resultStream()
         try await start()
         return stream
@@ -55,7 +55,7 @@ public actor TranscriptionService {
 
     /// One-shot transcription: Starts, waits for the first final result, then stops.
     /// - Returns: The first final `TranscriptionResult` observed.
-    public func transcribeOnce() async throws -> TranscriptionResult {
+    func transcribeOnce() async throws -> TranscriptionResult {
         if isRunning { throw TranscriptionError.alreadyRunning }
         let stream = resultStream()
         try await start()
@@ -86,7 +86,7 @@ public actor TranscriptionService {
     }
 
     /// Start transcription pipeline.
-    public func start() async throws {
+    func start() async throws {
         if isRunning { throw TranscriptionError.alreadyRunning }
         guard await prepareAssetsIfNeeded() else { throw TranscriptionError.modelUnavailable }
 
@@ -113,7 +113,7 @@ public actor TranscriptionService {
     }
 
     /// Stop transcription pipeline and release resources.
-    public func stop() async {
+    func stop() async {
         guard isRunning else { return }
         isRunning = false
         // First, stop engine to naturally end the results stream.

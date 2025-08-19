@@ -3,7 +3,7 @@ import Foundation
 /// Domain errors unified for the library.
 /// - Note: Kept stable to avoid leaking Apple private types.
 @available(iOS 26, *)
-public enum TranscriptionError: Error, Equatable, Sendable {
+enum TranscriptionError: Error, Equatable, Sendable {
     case notAuthorized
     case audioUnavailable
     case modelUnavailable
@@ -20,7 +20,7 @@ public enum TranscriptionError: Error, Equatable, Sendable {
 
 /// A unit of audio data independent from platform frameworks.
 @available(iOS 26, *)
-public struct AudioChunk: Sendable, Equatable {
+struct AudioChunk: Sendable, Equatable {
     public var bytes: Data
     public var sampleRate: Double
     public var channels: Int
@@ -36,7 +36,7 @@ public struct AudioChunk: Sendable, Equatable {
 
 /// Transcription result carrying interim and final texts.
 @available(iOS 26, *)
-public struct TranscriptionResult: Sendable, Equatable {
+struct TranscriptionResult: Sendable, Equatable {
     public let text: String
     public let isFinal: Bool
 
