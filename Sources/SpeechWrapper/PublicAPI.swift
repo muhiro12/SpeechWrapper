@@ -11,7 +11,7 @@ public struct SpeechClientSettings: Sendable, Equatable {
     public init(cancelPolicy: CancelPolicy = .throwError,
                 useLegacy: Bool = false,
                 locale: Locale? = nil,
-                requireUserStop: Bool = false) {
+                requireUserStop: Bool = true) {
         self.useLegacy = useLegacy
         self.cancelPolicy = cancelPolicy
         self.locale = locale
@@ -41,7 +41,7 @@ public final actor SpeechClient {
         return session
     }
 
-    /// One-shot recognition.
+    /// One-shot recognition: completes only when stopped/cancelled.
     public func transcribe() async throws -> String {
         let svc = TranscriptionService.usingMicrophone(locale: settings.locale,
                                                        forceLegacy: settings.useLegacy)
@@ -59,7 +59,7 @@ public final actor SpeechClient {
         throw TranscriptionError.transcriberFailed
     }
 
-    /// Streaming recognition.
+    /// Streaming recognition: does not auto-finish on final; finish by stop/cancel or consumer termination.
     public func stream() async throws -> AsyncStream<String> {
         let svc = TranscriptionService.usingMicrophone(locale: settings.locale,
                                                        forceLegacy: settings.useLegacy)
@@ -78,11 +78,6 @@ public final actor SpeechClient {
                         break
                     }
                     continuation.yield(r.text)
-                    if r.isFinal {
-                        await svc.stop()
-                        continuation.finish()
-                        break
-                    }
                 }
             }
             continuation.onTermination = { _ in
