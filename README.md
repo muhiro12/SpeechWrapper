@@ -7,17 +7,17 @@ Thin, testable facade for on-device speech-to-text using Apple’s latest Speech
 - Swift 6 / Xcode 26
 
 ## Minimal Usage (Public API)
-Only two functions are public, both using the built‑in microphone on iOS 26+.
+Only two entrypoints are public (as static methods), using the built‑in microphone on iOS 26+.
 
 ```swift
 import SpeechWrapper
 
 // 1) One‑shot: waits and returns the final text
-let text: String = try await speechToText()
+let text: String = try await SpeechClient.transcribe()
 print(text)
 
 // 2) Streaming: yields partial/final texts and finishes automatically
-let stream = try await speechToTextStream()
+let stream = try await SpeechClient.stream()
 for await text in stream {
     print(text)
 }
