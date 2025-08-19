@@ -15,16 +15,17 @@ actor TranscriptionService {
     /// Initializer using プラットフォーム既定のエンジン/アセット。
     init(audioInput: any AudioInput) {
         self.audioInput = audioInput
-        self.engine = PlatformDefaults.makeEngine()
-        self.assets = PlatformDefaults.makeAssets()
+        self.engine = PlatformDefaults.makeEngine(forceLegacy: false, locale: .current)
+        self.assets = PlatformDefaults.makeAssets(forceLegacy: false, locale: .current)
     }
 
     /// Factory: Service configured with built-in microphone input on iOS 26+.
     /// - Note: Falls back to a no-op input outside supported platforms.
-    static func usingMicrophone(forceLegacy: Bool = false) -> TranscriptionService {
+    static func usingMicrophone(forceLegacy: Bool = false, locale: Locale? = nil) -> TranscriptionService {
         let input = PlatformDefaults.makeDefaultAudioInput()
-        let engine = PlatformDefaults.makeEngine(forceLegacy: forceLegacy)
-        let assets = PlatformDefaults.makeAssets(forceLegacy: forceLegacy)
+        let effectiveLocale = locale ?? .current
+        let engine = PlatformDefaults.makeEngine(forceLegacy: forceLegacy, locale: effectiveLocale)
+        let assets = PlatformDefaults.makeAssets(forceLegacy: forceLegacy, locale: effectiveLocale)
         return TranscriptionService(audioInput: input, engine: engine, assets: assets)
     }
 
@@ -140,24 +141,24 @@ actor TranscriptionService {
 }
 
 enum PlatformDefaults {
-    static func makeEngine(forceLegacy: Bool = false) -> any TranscriptionEngine {
+    static func makeEngine(forceLegacy: Bool = false, locale: Locale) -> any TranscriptionEngine {
         #if os(iOS) && canImport(Speech)
         if #available(iOS 26, *), !forceLegacy {
-            return IOSSpeechEngine()
+            return IOSSpeechEngine(locale: locale)
         } else {
-            return LegacySpeechEngine()
+            return LegacySpeechEngine(locale: locale)
         }
         #else
         return NoopEngine()
         #endif
     }
 
-    static func makeAssets(forceLegacy: Bool = false) -> any AssetManaging {
+    static func makeAssets(forceLegacy: Bool = false, locale: Locale) -> any AssetManaging {
         #if os(iOS) && canImport(Speech)
         if #available(iOS 26, *), !forceLegacy {
-            return IOSAssetManager()
+            return IOSAssetManager(locale: locale)
         } else {
-            return LegacyAssetManager()
+            return LegacyAssetManager(locale: locale)
         }
         #else
         return NoopAssets()

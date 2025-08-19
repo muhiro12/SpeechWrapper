@@ -6,6 +6,7 @@ import AVFoundation
 
 @available(iOS 26, *)
 final class IOSSpeechEngine: TranscriptionEngine {
+    private let locale: Locale
     private var analyzer: SpeechAnalyzer?
     private var transcriber: SpeechTranscriber?
     private var inputSequence: AsyncStream<AnalyzerInput>?
@@ -15,7 +16,8 @@ final class IOSSpeechEngine: TranscriptionEngine {
     private let resultsStream: AsyncStream<TranscriptionResult>
     private let continuation: AsyncStream<TranscriptionResult>.Continuation
 
-    init() {
+    init(locale: Locale) {
+        self.locale = locale
         var c: AsyncStream<TranscriptionResult>.Continuation!
         self.resultsStream = AsyncStream { cont in c = cont }
         self.continuation = c
@@ -24,7 +26,7 @@ final class IOSSpeechEngine: TranscriptionEngine {
     var results: AsyncStream<TranscriptionResult> { resultsStream }
 
     func start(with input: AsyncStream<AudioChunk>) async throws {
-        let transcriber = SpeechTranscriber(locale: .current,
+        let transcriber = SpeechTranscriber(locale: locale,
                                             transcriptionOptions: [],
                                             reportingOptions: [.volatileResults],
                                             attributeOptions: [])
@@ -92,15 +94,18 @@ final class IOSSpeechEngine: TranscriptionEngine {
 
 @available(iOS 26, *)
 final class IOSAssetManager: AssetManaging {
+    private let locale: Locale
+
+    init(locale: Locale) { self.locale = locale }
 
     func ensureAssetsAvailable() async -> Bool {
-        let current = Locale.current
+        let current = locale
         let installed = await Set(SpeechTranscriber.installedLocales)
         return installed.map { $0.identifier(.bcp47) }.contains(current.identifier(.bcp47))
     }
 
     func installIfNeeded() async throws -> Bool {
-        let transcriber = SpeechTranscriber(locale: .current,
+        let transcriber = SpeechTranscriber(locale: locale,
                                             transcriptionOptions: [],
                                             reportingOptions: [],
                                             attributeOptions: [])

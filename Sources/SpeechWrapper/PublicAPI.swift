@@ -5,10 +5,17 @@ public enum CancelPolicy: Sendable { case throwError, returnEmpty }
 public struct SpeechClientSettings: Sendable, Equatable {
     public var useLegacy: Bool
     public var cancelPolicy: CancelPolicy
+    public var locale: Locale?
+    public var requireUserStop: Bool
 
-    public init(cancelPolicy: CancelPolicy = .throwError, useLegacy: Bool = false) {
+    public init(cancelPolicy: CancelPolicy = .throwError,
+                useLegacy: Bool = false,
+                locale: Locale? = nil,
+                requireUserStop: Bool = false) {
         self.useLegacy = useLegacy
         self.cancelPolicy = cancelPolicy
+        self.locale = locale
+        self.requireUserStop = requireUserStop
     }
 }
 
@@ -35,7 +42,8 @@ public final actor SpeechClient {
 
     /// One-shot recognition.
     public func transcribe() async throws -> String {
-        let svc = TranscriptionService.usingMicrophone(forceLegacy: settings.useLegacy)
+        let svc = TranscriptionService.usingMicrophone(forceLegacy: settings.useLegacy,
+                                                      locale: settings.locale)
         self.service = svc
         defer { Task { await svc.stop() } }
 
@@ -43,7 +51,7 @@ public final actor SpeechClient {
         var latestText = ""
         for await r in stream {
             latestText = r.text
-            if r.isFinal { return latestText }
+            if r.isFinal && !settings.requireUserStop { return latestText }
             if cancelRequested { return try await handleCancel() }
             if stopRequested { return latestText }
         }
@@ -52,7 +60,8 @@ public final actor SpeechClient {
 
     /// Streaming recognition.
     public func stream() async throws -> AsyncStream<String> {
-        let svc = TranscriptionService.usingMicrophone(forceLegacy: settings.useLegacy)
+        let svc = TranscriptionService.usingMicrophone(forceLegacy: settings.useLegacy,
+                                                      locale: settings.locale)
         self.service = svc
         let source = try await svc.startStreaming()
         return AsyncStream<String> { continuation in
