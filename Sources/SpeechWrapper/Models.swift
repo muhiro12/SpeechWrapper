@@ -18,6 +18,39 @@ enum TranscriptionError: Error, Equatable, Sendable {
     case unknown
 }
 
+// Provide human-friendly messages without exposing the enum publicly.
+@available(iOS 26, *)
+extension TranscriptionError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .notAuthorized:
+            return "Microphone access is not authorized."
+        case .audioUnavailable:
+            return "Audio input is unavailable."
+        case .modelUnavailable:
+            return "Required on-device speech model is unavailable."
+        case .setupFailed:
+            return "Failed to set up the transcription pipeline."
+        case .analyzerFailed:
+            return "Speech analyzer failed."
+        case .transcriberFailed:
+            return "Speech transcriber failed."
+        case .alreadyRunning:
+            return "Transcription is already running."
+        case .notRunning:
+            return "Transcription is not running."
+        case .cancelled:
+            return "Operation was cancelled."
+        case .unsupportedPlatform:
+            return "Unsupported platform."
+        case .assetInstallFailed:
+            return "Failed to install required assets."
+        case .unknown:
+            return "An unknown error occurred."
+        }
+    }
+}
+
 /// A unit of audio data independent from platform frameworks.
 @available(iOS 26, *)
 struct AudioChunk: Sendable, Equatable {

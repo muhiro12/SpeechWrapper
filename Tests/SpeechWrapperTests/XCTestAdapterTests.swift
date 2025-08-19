@@ -77,5 +77,9 @@ final class XCTestAdapterTests: XCTestCase {
         XCTAssertEqual(results, [.init(text: "hi", isFinal: false), .init(text: "hi there", isFinal: true)])
         await service.stop()
     }
-}
 
+    func test_error_has_message() throws {
+        let err: Error = TranscriptionError.notAuthorized
+        XCTAssertFalse(err.localizedDescription.isEmpty)
+    }
+}
