@@ -21,6 +21,13 @@ let stream = try await SpeechClient.stream()
 for await text in stream {
     print(text)
 }
+
+// Optional: Force legacy (iOS 17/18) code path even on iOS 26+
+let textLegacy: String = try await SpeechClient.transcribe(useLegacy: true)
+let streamLegacy = try await SpeechClient.stream(useLegacy: true)
+for await text in stream {
+    print(text)
+}
 ```
 
 ## App Permissions

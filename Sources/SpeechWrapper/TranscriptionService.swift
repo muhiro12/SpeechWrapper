@@ -21,8 +21,11 @@ actor TranscriptionService {
 
     /// Factory: Service configured with built-in microphone input on iOS 26+.
     /// - Note: Falls back to a no-op input outside supported platforms.
-    static func usingMicrophone() -> TranscriptionService {
-        TranscriptionService(audioInput: PlatformDefaults.makeDefaultAudioInput())
+    static func usingMicrophone(forceLegacy: Bool = false) -> TranscriptionService {
+        let input = PlatformDefaults.makeDefaultAudioInput()
+        let engine = PlatformDefaults.makeEngine(forceLegacy: forceLegacy)
+        let assets = PlatformDefaults.makeAssets(forceLegacy: forceLegacy)
+        return TranscriptionService(audioInput: input, engine: engine, assets: assets)
     }
 
     /// Internal initializer for DI（ユニットテスト用）。
@@ -137,9 +140,9 @@ actor TranscriptionService {
 }
 
 enum PlatformDefaults {
-    static func makeEngine() -> any TranscriptionEngine {
+    static func makeEngine(forceLegacy: Bool = false) -> any TranscriptionEngine {
         #if os(iOS) && canImport(Speech)
-        if #available(iOS 26, *) {
+        if #available(iOS 26, *), !forceLegacy {
             return IOSSpeechEngine()
         } else {
             return LegacySpeechEngine()
@@ -149,9 +152,9 @@ enum PlatformDefaults {
         #endif
     }
 
-    static func makeAssets() -> any AssetManaging {
+    static func makeAssets(forceLegacy: Bool = false) -> any AssetManaging {
         #if os(iOS) && canImport(Speech)
-        if #available(iOS 26, *) {
+        if #available(iOS 26, *), !forceLegacy {
             return IOSAssetManager()
         } else {
             return LegacyAssetManager()
