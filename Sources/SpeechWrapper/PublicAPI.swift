@@ -33,7 +33,8 @@ public final actor SpeechClient {
     /// Begin a controllable transcription session and return a handle.
     /// Call `wait()` to get the final/stop/cancel result later.
     public func beginTranscribe() async throws -> SpeechTranscription {
-        let svc = TranscriptionService.usingMicrophone(forceLegacy: settings.useLegacy)
+        let svc = TranscriptionService.usingMicrophone(locale: settings.locale,
+                                                       forceLegacy: settings.useLegacy)
         let source = try await svc.startStreaming()
         let session = SpeechTranscription(service: svc, settings: settings)
         await session.start(with: source)
@@ -42,8 +43,8 @@ public final actor SpeechClient {
 
     /// One-shot recognition.
     public func transcribe() async throws -> String {
-        let svc = TranscriptionService.usingMicrophone(forceLegacy: settings.useLegacy,
-                                                      locale: settings.locale)
+        let svc = TranscriptionService.usingMicrophone(locale: settings.locale,
+                                                       forceLegacy: settings.useLegacy)
         self.service = svc
         defer { Task { await svc.stop() } }
 
@@ -60,8 +61,8 @@ public final actor SpeechClient {
 
     /// Streaming recognition.
     public func stream() async throws -> AsyncStream<String> {
-        let svc = TranscriptionService.usingMicrophone(forceLegacy: settings.useLegacy,
-                                                      locale: settings.locale)
+        let svc = TranscriptionService.usingMicrophone(locale: settings.locale,
+                                                       forceLegacy: settings.useLegacy)
         self.service = svc
         let source = try await svc.startStreaming()
         return AsyncStream<String> { continuation in

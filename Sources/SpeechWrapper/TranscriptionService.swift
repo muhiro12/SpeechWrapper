@@ -15,17 +15,17 @@ actor TranscriptionService {
     /// Initializer using プラットフォーム既定のエンジン/アセット。
     init(audioInput: any AudioInput) {
         self.audioInput = audioInput
-        self.engine = PlatformDefaults.makeEngine(forceLegacy: false, locale: .current)
-        self.assets = PlatformDefaults.makeAssets(forceLegacy: false, locale: .current)
+        self.engine = PlatformDefaults.makeEngine(locale: .current, forceLegacy: false)
+        self.assets = PlatformDefaults.makeAssets(locale: .current, forceLegacy: false)
     }
 
     /// Factory: Service configured with built-in microphone input on iOS 26+.
     /// - Note: Falls back to a no-op input outside supported platforms.
-    static func usingMicrophone(forceLegacy: Bool = false, locale: Locale? = nil) -> TranscriptionService {
+    static func usingMicrophone(locale: Locale? = nil, forceLegacy: Bool = false) -> TranscriptionService {
         let input = PlatformDefaults.makeDefaultAudioInput()
         let effectiveLocale = locale ?? .current
-        let engine = PlatformDefaults.makeEngine(forceLegacy: forceLegacy, locale: effectiveLocale)
-        let assets = PlatformDefaults.makeAssets(forceLegacy: forceLegacy, locale: effectiveLocale)
+        let engine = PlatformDefaults.makeEngine(locale: effectiveLocale, forceLegacy: forceLegacy)
+        let assets = PlatformDefaults.makeAssets(locale: effectiveLocale, forceLegacy: forceLegacy)
         return TranscriptionService(audioInput: input, engine: engine, assets: assets)
     }
 
@@ -141,7 +141,7 @@ actor TranscriptionService {
 }
 
 enum PlatformDefaults {
-    static func makeEngine(forceLegacy: Bool = false, locale: Locale) -> any TranscriptionEngine {
+    static func makeEngine(locale: Locale, forceLegacy: Bool = false) -> any TranscriptionEngine {
         #if os(iOS) && canImport(Speech)
         if #available(iOS 26, *), !forceLegacy {
             return IOSSpeechEngine(locale: locale)
@@ -153,7 +153,7 @@ enum PlatformDefaults {
         #endif
     }
 
-    static func makeAssets(forceLegacy: Bool = false, locale: Locale) -> any AssetManaging {
+    static func makeAssets(locale: Locale, forceLegacy: Bool = false) -> any AssetManaging {
         #if os(iOS) && canImport(Speech)
         if #available(iOS 26, *), !forceLegacy {
             return IOSAssetManager(locale: locale)
