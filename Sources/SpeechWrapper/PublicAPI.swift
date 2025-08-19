@@ -6,7 +6,7 @@ public struct SpeechClientSettings: Sendable, Equatable {
     public var useLegacy: Bool
     public var cancelPolicy: CancelPolicy
 
-    public init(useLegacy: Bool = false, cancelPolicy: CancelPolicy = .throwError) {
+    public init(cancelPolicy: CancelPolicy = .throwError, useLegacy: Bool = false) {
         self.useLegacy = useLegacy
         self.cancelPolicy = cancelPolicy
     }

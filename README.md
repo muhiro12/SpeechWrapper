@@ -13,7 +13,7 @@ Two entrypoints via an instance client, using the built‑in microphone. On iOS 
 import SpeechWrapper
 
 // Configure once (optional). Defaults: latest API on iOS 26+, cancel throws.
-let client = SpeechClient(settings: .init(useLegacy: false, cancelPolicy: .throwError))
+let client = SpeechClient(settings: .init(cancelPolicy: .throwError, useLegacy: false))
 
 // 1) One‑shot: waits and returns the final text (auto endpoint detection)
 let text: String = try await client.transcribe()
