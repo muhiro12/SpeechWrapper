@@ -1,7 +1,6 @@
 import XCTest
 @testable import SpeechWrapper
 
-@available(iOS 26, *)
 final class XCTestAdapterTests: XCTestCase {
 
     // MARK: - Test Doubles (simplified)

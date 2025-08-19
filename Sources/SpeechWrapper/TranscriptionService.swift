@@ -1,8 +1,6 @@
 import Foundation
 
 /// Actor-based facade providing a thin, clean API for speech-to-text.
-/// - Availability: iOS 26+
-@available(iOS 26, *)
 actor TranscriptionService {
     private let audioInput: any AudioInput
     private let engine: any TranscriptionEngine
@@ -143,26 +141,31 @@ enum PlatformDefaults {
         #if os(iOS) && canImport(Speech)
         if #available(iOS 26, *) {
             return IOSSpeechEngine()
+        } else {
+            return LegacySpeechEngine()
         }
-        #endif
+        #else
         return NoopEngine()
+        #endif
     }
 
     static func makeAssets() -> any AssetManaging {
         #if os(iOS) && canImport(Speech)
         if #available(iOS 26, *) {
             return IOSAssetManager()
+        } else {
+            return LegacyAssetManager()
         }
-        #endif
+        #else
         return NoopAssets()
+        #endif
     }
 
     static func makeDefaultAudioInput() -> any AudioInput {
         #if os(iOS)
-        if #available(iOS 26, *) {
-            return MicrophoneInput()
-        }
-        #endif
+        return MicrophoneInput()
+        #else
         return NoopMicrophone()
+        #endif
     }
 }

@@ -1,7 +1,6 @@
 import Foundation
 
 /// Public entry point type avoiding collision with Apple's `Speech` framework.
-@available(iOS 26, *)
 public enum SpeechClient {
     /// One-shot: starts mic and returns the final transcript text.
     public static func transcribe() async throws -> String {

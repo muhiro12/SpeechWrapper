@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "SpeechWrapper",
     platforms: [
-        .iOS(.v26)
+        .iOS(.v17)
     ],
     products: [
         .library(

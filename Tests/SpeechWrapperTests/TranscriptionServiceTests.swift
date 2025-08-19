@@ -3,7 +3,6 @@ import Testing
 
 // MARK: - Test Doubles
 
-@available(iOS 26, *)
 final class MockAudioInput: AudioInput {
     private let subject: AsyncStream<AudioChunk>
     private let continuation: AsyncStream<AudioChunk>.Continuation
@@ -28,7 +27,6 @@ final class MockAudioInput: AudioInput {
     func finish() { continuation.finish() }
 }
 
-@available(iOS 26, *)
 final class MockEngine: TranscriptionEngine {
     private let stream: AsyncStream<TranscriptionResult>
     private let continuation: AsyncStream<TranscriptionResult>.Continuation
@@ -54,7 +52,6 @@ final class MockEngine: TranscriptionEngine {
     func finish() { continuation.finish() }
 }
 
-@available(iOS 26, *)
 final class MockAssetsManager: AssetManaging {
     var available: Bool
     var installSucceeds: Bool
@@ -79,7 +76,6 @@ extension MockAssetsManager: @unchecked Sendable {}
 
 // MARK: - Tests (Swift Testing)
 
-@available(iOS 26, *)
 @Test func streaming_twoResults_then_stop() async throws {
     let input = MockAudioInput()
     let engine = MockEngine()
@@ -112,7 +108,6 @@ extension MockAssetsManager: @unchecked Sendable {}
     #expect(results[1] == .init(text: "hello world", isFinal: true))
 }
 
-@available(iOS 26, *)
 @Test func assets_install_then_start_succeeds() async throws {
     let input = MockAudioInput()
     let engine = MockEngine()
@@ -125,7 +120,6 @@ extension MockAssetsManager: @unchecked Sendable {}
     #expect(assets.installCount == 1)
 }
 
-@available(iOS 26, *)
 @Test func stop_is_idempotent() async throws {
     let input = MockAudioInput()
     let engine = MockEngine()
@@ -140,7 +134,6 @@ extension MockAssetsManager: @unchecked Sendable {}
     #expect(input.stopped)
 }
 
-@available(iOS 26, *)
 @Test func transcribeOnce_returns_final() async throws {
     let input = MockAudioInput()
     let engine = MockEngine()
@@ -159,7 +152,6 @@ extension MockAssetsManager: @unchecked Sendable {}
     #expect(input.stopped)
 }
 
-@available(iOS 26, *)
 @Test func start_while_running_throws() async {
     let input = MockAudioInput()
     let engine = MockEngine()

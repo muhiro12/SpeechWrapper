@@ -3,7 +3,6 @@ import Foundation
 #if os(iOS)
 @preconcurrency import AVFoundation
 
-@available(iOS 26, *)
 final class MicrophoneInput: AudioInput {
     private let engine = AVAudioEngine()
     private var cont: AsyncStream<AudioChunk>.Continuation!
@@ -83,7 +82,6 @@ final class MicrophoneInput: AudioInput {
     }
 }
 
-@available(iOS 26, *)
 extension MicrophoneInput: @unchecked Sendable {}
 
 #endif
