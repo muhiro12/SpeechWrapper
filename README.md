@@ -19,33 +19,19 @@ let client = SpeechClient(settings: .init(cancelPolicy: .throwError, useLegacy: 
 let stream = try await client.stream()
 for await text in stream { print(text) }
 
-// 2) Simple one-shot: returns only when you call stop()/cancel()
-let transcribeTask = Task { try await client.transcribe() }
 // ... later, user taps Stop to finish
 await client.stop()
-let text = try await transcribeTask.value
 
 // Optional: Force legacy (iOS 17/18) path even on iOS 26+
 let legacyClient = SpeechClient(settings: .init(useLegacy: true))
 let legacyText = try await legacyClient.transcribe()
 
-// Manual control using a session handle (awaitable wait())
-let session = try await client.beginTranscribe()
-// ... later, user taps Stop -> returns latest interim
-await session.stop()
-let stopped = try await session.wait()
-
-// Cancel and return empty
-let session2 = try await SpeechClient(settings: .init(cancelPolicy: .returnEmpty)).beginTranscribe()
-await session2.cancel()
-let empty = try await session2.wait()  // ""
+// (One-shot pattern can be built by the app using Task + stop())
 ```
 
 ### Settings (trailing config; safe defaults)
-- `cancelPolicy`: `.throwError` (default) or `.returnEmpty`
 - `useLegacy`: `false` (default). For development to force iOS 17/18 fallback even on 26+.
 - `locale`: `nil` (default) → uses `Locale.current`. Set explicitly, e.g., `Locale(identifier: "ja-JP")`.
-- `requireUserStop`: `true` (default). `transcribe()` ignores automatic final and waits for `stop()`.
 
 ## App Permissions
 - `NSMicrophoneUsageDescription`
