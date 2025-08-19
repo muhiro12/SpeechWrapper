@@ -7,52 +7,38 @@ Thin, testable facade for on-device speech-to-text using Apple’s latest Speech
 - Swift 6 / Xcode 26
 
 ## Minimal Usage (Public API)
-Only two entrypoints are public (as static methods), using the built‑in microphone. On iOS 26+, the latest Speech APIs are used; on iOS 17/18, a compatible fallback is used.
+Two entrypoints via an instance client, using the built‑in microphone. On iOS 26+, the latest Speech APIs are used; on iOS 17/18, a compatible fallback is used.
 
 ```swift
 import SpeechWrapper
 
-// 1) One‑shot: waits and returns the final text
-let text: String = try await SpeechClient.transcribe()
+// Configure once (optional). Defaults: latest API on iOS 26+, cancel throws.
+let client = SpeechClient(settings: .init(useLegacy: false, cancelPolicy: .throwError))
+
+// 1) One‑shot: waits and returns the final text (auto endpoint detection)
+let text: String = try await client.transcribe()
 print(text)
 
-// 2) Streaming: yields partial/final texts and finishes automatically
-let stream = try await SpeechClient.stream()
-for await text in stream {
-    print(text)
-}
+// 2) Streaming: yields partial/final texts; finishes automatically on final
+let stream = try await client.stream()
+for await text in stream { print(text) }
 
-// Optional: Force legacy (iOS 17/18) code path even on iOS 26+
-let textLegacy: String = try await SpeechClient.transcribe(useLegacy: true)
-let streamLegacy = try await SpeechClient.stream(useLegacy: true)
-for await text in stream {
-    print(text)
-}
+// Optional: Force legacy (iOS 17/18) path even on iOS 26+
+let legacyClient = SpeechClient(settings: .init(useLegacy: true))
+let legacyText = try await legacyClient.transcribe()
 
-// 3) Manual control within a single transcribe() call
-//    - stop(): user explicitly stops and gets the latest interim text
-//    - cancel(): user/system cancels; choose policy to return empty or throw
-let control = SpeechClient.Control()
-let task = Task { try await SpeechClient.transcribe(control: control) }
-// ... later, user taps Stop button
-await control.stop()
-let stoppedText = try await task.value  // latest interim text
+// Manual stop/cancel with the same API
+let c = SpeechClient()
+let task = Task { try await c.transcribe() }
+// ... later, user taps Stop -> returns latest interim
+await c.stop()
+let stopped = try await task.value
 
-// Cancel with empty string result
-let control2 = SpeechClient.Control()
-let task2 = Task { try await SpeechClient.transcribe(control: control2, cancelPolicy: .returnEmpty) }
-await control2.cancel()
-let cancelledAsEmpty = try await task2.value  // ""
-
-// Cancel as error
-let control3 = SpeechClient.Control()
-let task3 = Task { try await SpeechClient.transcribe(control: control3, cancelPolicy: .throwError) }
-await control3.cancel()
-do {
-    _ = try await task3.value
-} catch {
-    print(error.localizedDescription)  // TranscriptionError.cancelled
-}
+// Cancel and return empty
+let c2 = SpeechClient(settings: .init(cancelPolicy: .returnEmpty))
+let t2 = Task { try await c2.transcribe() }
+await c2.cancel()
+let empty = try await t2.value  // ""
 ```
 
 ## App Permissions
