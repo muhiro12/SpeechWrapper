@@ -23,6 +23,16 @@ public final actor SpeechClient {
         self.settings = settings
     }
 
+    /// Begin a controllable transcription session and return a handle.
+    /// Call `wait()` to get the final/stop/cancel result later.
+    public func beginTranscribe() async throws -> SpeechTranscription {
+        let svc = TranscriptionService.usingMicrophone(forceLegacy: settings.useLegacy)
+        let source = try await svc.startStreaming()
+        let session = SpeechTranscription(service: svc, settings: settings)
+        await session.start(with: source)
+        return session
+    }
+
     /// One-shot recognition.
     public func transcribe() async throws -> String {
         let svc = TranscriptionService.usingMicrophone(forceLegacy: settings.useLegacy)
@@ -80,5 +90,91 @@ public final actor SpeechClient {
         case .returnEmpty: return ""
         case .throwError: throw TranscriptionError.cancelled
         }
+    }
+}
+
+/// A single transcription session handle.
+public final actor SpeechTranscription {
+    private let settings: SpeechClientSettings
+    private let service: TranscriptionService
+    private var stream: AsyncStream<TranscriptionResult>?
+    private var latestText: String = ""
+    private var finishedText: String?
+    private var finishedError: Error?
+    private var waiter: CheckedContinuation<String, Error>?
+    private var readerTask: Task<Void, Never>?
+    private var stopRequested = false
+    private var cancelRequested = false
+
+    init(service: TranscriptionService, settings: SpeechClientSettings) {
+        self.service = service
+        self.settings = settings
+    }
+
+    func start(with stream: AsyncStream<TranscriptionResult>) {
+        self.stream = stream
+        readerTask = Task { [weak self] in
+            await self?.run(stream: stream)
+        }
+    }
+
+    private func run(stream: AsyncStream<TranscriptionResult>) async {
+        for await r in stream {
+            latestText = r.text
+            if r.isFinal {
+                await finish(with: r.text)
+                return
+            }
+            if cancelRequested {
+                await finishByCancel()
+                return
+            }
+            if stopRequested {
+                await finish(with: latestText)
+                return
+            }
+        }
+        if finishedText == nil && finishedError == nil {
+            await finish(error: TranscriptionError.transcriberFailed)
+        }
+    }
+
+    public func wait() async throws -> String {
+        if let t = finishedText { return t }
+        if let e = finishedError { throw e }
+        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<String, Error>) in
+            self.waiter = cont
+        }
+    }
+
+    public func stop() { stopRequested = true }
+    public func cancel() { cancelRequested = true }
+
+    private func finish(with text: String) async {
+        finishedText = text
+        await cleanup()
+        if let waiter = waiter { waiter.resume(returning: text); self.waiter = nil }
+    }
+
+    private func finish(error: Error) async {
+        finishedError = error
+        await cleanup()
+        if let waiter = waiter { waiter.resume(throwing: error); self.waiter = nil }
+    }
+
+    private func finishByCancel() async {
+        switch settings.cancelPolicy {
+        case .returnEmpty:
+            await finish(with: "")
+        case .throwError:
+            await finish(error: TranscriptionError.cancelled)
+        }
+    }
+
+    private func cleanup() async {
+        await service.stop()
+        readerTask?.cancel()
+        readerTask = nil
+        stream = nil
     }
 }

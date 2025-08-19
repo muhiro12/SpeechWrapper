@@ -27,18 +27,16 @@ for await text in stream { print(text) }
 let legacyClient = SpeechClient(settings: .init(useLegacy: true))
 let legacyText = try await legacyClient.transcribe()
 
-// Manual stop/cancel with the same API
-let c = SpeechClient()
-let task = Task { try await c.transcribe() }
+// Manual control using a session handle (awaitable wait())
+let session = try await client.beginTranscribe()
 // ... later, user taps Stop -> returns latest interim
-await c.stop()
-let stopped = try await task.value
+await session.stop()
+let stopped = try await session.wait()
 
 // Cancel and return empty
-let c2 = SpeechClient(settings: .init(cancelPolicy: .returnEmpty))
-let t2 = Task { try await c2.transcribe() }
-await c2.cancel()
-let empty = try await t2.value  // ""
+let session2 = try await SpeechClient(settings: .init(cancelPolicy: .returnEmpty)).beginTranscribe()
+await session2.cancel()
+let empty = try await session2.wait()  // ""
 ```
 
 ## App Permissions
