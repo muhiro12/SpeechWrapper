@@ -1,16 +1,5 @@
 import Foundation
 
-public struct SpeechClientSettings: Sendable, Equatable {
-    public var locale: Locale?
-    public var useLegacy: Bool
-
-    public init(locale: Locale? = nil,
-                useLegacy: Bool = false) {
-        self.locale = locale
-        self.useLegacy = useLegacy
-    }
-}
-
 /// Instance-based client: start a stream, stop when done.
 public final actor SpeechClient {
     private let settings: SpeechClientSettings
@@ -47,3 +36,4 @@ public final actor SpeechClient {
     /// Stop the active stream and release resources.
     public func stop() { stopRequested = true }
 }
+
