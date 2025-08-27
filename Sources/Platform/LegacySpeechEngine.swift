@@ -80,4 +80,3 @@ final class LegacySpeechEngine: TranscriptionEngine {
 extension LegacySpeechEngine: @unchecked Sendable {}
 
 #endif
-

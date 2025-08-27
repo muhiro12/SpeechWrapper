@@ -10,4 +10,3 @@ public struct SpeechClientSettings: Sendable, Equatable {
         self.useLegacy = useLegacy
     }
 }
-

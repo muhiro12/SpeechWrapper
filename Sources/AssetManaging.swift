@@ -7,4 +7,3 @@ protocol AssetManaging: Sendable {
     /// Attempts to install missing assets. Returns true on success.
     func installIfNeeded() async throws -> Bool
 }
-

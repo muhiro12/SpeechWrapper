@@ -9,4 +9,3 @@ protocol AudioInput: Sendable {
     /// Stream of audio data chunks.
     var chunks: AsyncStream<AudioChunk> { get }
 }
-

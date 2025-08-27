@@ -25,4 +25,3 @@ final class LegacyAssetManager: AssetManaging {
 extension LegacyAssetManager: @unchecked Sendable {}
 
 #endif
-

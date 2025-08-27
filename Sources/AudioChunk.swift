@@ -14,4 +14,3 @@ struct AudioChunk: Sendable, Equatable {
         self.isFinal = isFinal
     }
 }
-

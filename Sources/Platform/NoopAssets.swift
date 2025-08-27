@@ -6,4 +6,3 @@ final class NoopAssets: AssetManaging {
 }
 
 extension NoopAssets: @unchecked Sendable {}
-

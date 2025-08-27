@@ -9,4 +9,3 @@ final class NoopMicrophone: AudioInput {
 }
 
 extension NoopMicrophone: @unchecked Sendable {}
-

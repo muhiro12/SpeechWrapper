@@ -10,7 +10,7 @@ actor TranscriptionService {
     private var didFallbackToLegacy = false
 
     private var isRunning = false
-    private var forwarderTask: Task<Void, Never>? = nil
+    private var forwarderTask: Task<Void, Never>?
 
     // Multicast to subscribers
     private var subscribers: [UUID: AsyncStream<TranscriptionResult>.Continuation] = [:]
@@ -151,7 +151,7 @@ actor TranscriptionService {
         if #available(iOS 26, *) {
             // New engine path was selected; allow fallback for setup/asset failures.
             return (error as? TranscriptionError) == .modelUnavailable ||
-                   (error as? TranscriptionError) == .setupFailed
+                (error as? TranscriptionError) == .setupFailed
         } else {
             return false
         }

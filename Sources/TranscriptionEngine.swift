@@ -6,4 +6,3 @@ protocol TranscriptionEngine: Sendable {
     var results: AsyncStream<TranscriptionResult> { get }
     func stop() async
 }
-

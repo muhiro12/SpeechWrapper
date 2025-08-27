@@ -36,4 +36,3 @@ public final actor SpeechClient {
     /// Stop the active stream and release resources.
     public func stop() { stopRequested = true }
 }
-

@@ -32,4 +32,3 @@ final class IOSAssetManager: AssetManaging {
 extension IOSAssetManager: @unchecked Sendable {}
 
 #endif
-

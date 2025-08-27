@@ -10,4 +10,3 @@ struct TranscriptionResult: Sendable, Equatable {
         self.isFinal = isFinal
     }
 }
-

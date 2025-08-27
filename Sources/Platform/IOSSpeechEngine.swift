@@ -96,4 +96,3 @@ final class IOSSpeechEngine: TranscriptionEngine {
 extension IOSSpeechEngine: @unchecked Sendable {}
 
 #endif
-
