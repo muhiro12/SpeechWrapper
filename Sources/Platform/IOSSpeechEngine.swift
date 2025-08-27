@@ -66,7 +66,7 @@ final class IOSSpeechEngine: TranscriptionEngine {
                 pcm.frameLength = AVAudioFrameCount(frames)
                 bytes.withUnsafeBytes { raw in
                     guard let src = raw.bindMemory(to: Float.self).baseAddress else { return }
-                    pcm.floatChannelData![0].assign(from: src, count: frames)
+                    pcm.floatChannelData![0].update(from: src, count: frames)
                 }
                 builder.yield(AnalyzerInput(buffer: pcm))
             }

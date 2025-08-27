@@ -2,6 +2,7 @@ import Foundation
 
 #if os(iOS)
 @preconcurrency import AVFoundation
+import AVFAudio
 
 final class MicrophoneInput: AudioInput {
     private let engine = AVAudioEngine()
@@ -25,7 +26,9 @@ final class MicrophoneInput: AudioInput {
         try session.setActive(true)
 
         let granted: Bool = await withCheckedContinuation { continuation in
-            session.requestRecordPermission { ok in continuation.resume(returning: ok) }
+            AVAudioApplication.requestRecordPermission { ok in
+                continuation.resume(returning: ok)
+            }
         }
         guard granted else { throw TranscriptionError.notAuthorized }
 
@@ -43,9 +46,10 @@ final class MicrophoneInput: AudioInput {
             guard let outBuf = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: outCapacity) else { return }
             outBuf.frameLength = outCapacity
             var error: NSError?
+            let box = _PCMBufferBox(buffer: buffer)
             let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
                 outStatus.pointee = .haveData
-                return buffer
+                return box.buffer
             }
             if let converter, converter.inputFormat != converter.outputFormat {
                 _ = converter.convert(to: outBuf, error: &error, withInputFrom: inputBlock)
@@ -80,6 +84,10 @@ final class MicrophoneInput: AudioInput {
         isRunning = false
         cont.finish()
     }
+}
+
+private struct _PCMBufferBox: @unchecked Sendable {
+    let buffer: AVAudioPCMBuffer
 }
 
 extension MicrophoneInput: @unchecked Sendable {}

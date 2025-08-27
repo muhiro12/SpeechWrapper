@@ -67,11 +67,8 @@ final class MockAssetsManager: AssetManaging {
     func installIfNeeded() async throws -> Bool { installCount += 1; if installSucceeds { available = true }; return installSucceeds }
 }
 
-@available(iOS 26, *)
 extension MockAudioInput: @unchecked Sendable {}
-@available(iOS 26, *)
 extension MockEngine: @unchecked Sendable {}
-@available(iOS 26, *)
 extension MockAssetsManager: @unchecked Sendable {}
 
 // MARK: - Tests (Swift Testing)
