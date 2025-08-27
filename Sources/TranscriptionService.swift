@@ -3,11 +3,14 @@ import Foundation
 /// Actor-based facade providing a thin, clean API for speech-to-text.
 actor TranscriptionService {
     private let audioInput: any AudioInput
-    private let engine: any TranscriptionEngine
-    private let assets: any AssetManaging
+    private var engine: any TranscriptionEngine
+    private var assets: any AssetManaging
+    private let locale: Locale
+    private let forceLegacyRequested: Bool
+    private var didFallbackToLegacy = false
 
     private var isRunning = false
-    private var forwarderTask: Task<Void, Never>? = nil
+    private var forwarderTask: Task<Void, Never>?
 
     // Multicast to subscribers
     private var subscribers: [UUID: AsyncStream<TranscriptionResult>.Continuation] = [:]
@@ -15,8 +18,10 @@ actor TranscriptionService {
     /// Initializer using プラットフォーム既定のエンジン/アセット。
     init(audioInput: any AudioInput) {
         self.audioInput = audioInput
-        self.engine = PlatformDefaults.makeEngine(locale: .current, forceLegacy: false)
-        self.assets = PlatformDefaults.makeAssets(locale: .current, forceLegacy: false)
+        self.locale = .current
+        self.forceLegacyRequested = false
+        self.engine = PlatformDefaults.makeEngine(locale: locale, forceLegacy: forceLegacyRequested)
+        self.assets = PlatformDefaults.makeAssets(locale: locale, forceLegacy: forceLegacyRequested)
     }
 
     /// Factory: Service configured with built-in microphone input on iOS 26+.
@@ -26,7 +31,11 @@ actor TranscriptionService {
         let effectiveLocale = locale ?? .current
         let engine = PlatformDefaults.makeEngine(locale: effectiveLocale, forceLegacy: forceLegacy)
         let assets = PlatformDefaults.makeAssets(locale: effectiveLocale, forceLegacy: forceLegacy)
-        return TranscriptionService(audioInput: input, engine: engine, assets: assets)
+        return TranscriptionService(audioInput: input,
+                                    engine: engine,
+                                    assets: assets,
+                                    locale: effectiveLocale,
+                                    forceLegacyRequested: forceLegacy)
     }
 
     /// Internal initializer for DI（ユニットテスト用）。
@@ -34,6 +43,21 @@ actor TranscriptionService {
         self.audioInput = audioInput
         self.engine = engine
         self.assets = assets
+        self.locale = .current
+        self.forceLegacyRequested = false
+    }
+
+    /// Internal initializer used by factory to carry locale/flags.
+    init(audioInput: any AudioInput,
+         engine: any TranscriptionEngine,
+         assets: any AssetManaging,
+         locale: Locale,
+         forceLegacyRequested: Bool) {
+        self.audioInput = audioInput
+        self.engine = engine
+        self.assets = assets
+        self.locale = locale
+        self.forceLegacyRequested = forceLegacyRequested
     }
 
     /// Returns a stream of transcription results. Subscribe before or after `start()`.
@@ -90,28 +114,60 @@ actor TranscriptionService {
     /// Start transcription pipeline.
     func start() async throws {
         if isRunning { throw TranscriptionError.alreadyRunning }
+        // Attempt primary engine; if it fails early on iOS 26+ and not forced legacy, try legacy once.
+        do {
+            try await startPipelineOnce()
+        } catch {
+            if await shouldAttemptLegacyFallback(after: error) {
+                await performLegacyFallback()
+                do {
+                    try await startPipelineOnce()
+                } catch {
+                    throw error
+                }
+            } else {
+                throw error
+            }
+        }
+    }
+
+    private func startPipelineOnce() async throws {
         guard await prepareAssetsIfNeeded() else { throw TranscriptionError.modelUnavailable }
-
-        do {
-            try await audioInput.start()
-        } catch {
-            throw TranscriptionError.audioUnavailable
-        }
-
-        do {
-            try await engine.start(with: audioInput.chunks)
-        } catch {
-            throw TranscriptionError.setupFailed
-        }
+        do { try await audioInput.start() } catch { throw TranscriptionError.audioUnavailable }
+        do { try await engine.start(with: audioInput.chunks) } catch { throw TranscriptionError.setupFailed }
 
         isRunning = true
         let resultsStream = engine.results
         forwarderTask = Task { [weak self] in
             guard let self else { return }
-            for await result in resultsStream {
-                await self.broadcast(result)
-            }
+            for await result in resultsStream { await self.broadcast(result) }
         }
+    }
+
+    private func shouldAttemptLegacyFallback(after error: Error) async -> Bool {
+        if didFallbackToLegacy { return false }
+        if forceLegacyRequested { return false }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            // New engine path was selected; allow fallback for setup/asset failures.
+            return (error as? TranscriptionError) == .modelUnavailable ||
+                (error as? TranscriptionError) == .setupFailed
+        } else {
+            return false
+        }
+        #else
+        return false
+        #endif
+    }
+
+    private func performLegacyFallback() async {
+        didFallbackToLegacy = true
+        // Stop any partial pipeline.
+        await engine.stop()
+        await audioInput.stop()
+        // Swap to legacy components and retry.
+        self.engine = PlatformDefaults.makeEngine(locale: locale, forceLegacy: true)
+        self.assets = PlatformDefaults.makeAssets(locale: locale, forceLegacy: true)
     }
 
     /// Stop transcription pipeline and release resources.
@@ -137,39 +193,5 @@ actor TranscriptionService {
     private func finishAll() {
         for (_, c) in subscribers { c.finish() }
         subscribers.removeAll(keepingCapacity: false)
-    }
-}
-
-enum PlatformDefaults {
-    static func makeEngine(locale: Locale, forceLegacy: Bool = false) -> any TranscriptionEngine {
-        #if os(iOS) && canImport(Speech)
-        if #available(iOS 26, *), !forceLegacy {
-            return IOSSpeechEngine(locale: locale)
-        } else {
-            return LegacySpeechEngine(locale: locale)
-        }
-        #else
-        return NoopEngine()
-        #endif
-    }
-
-    static func makeAssets(locale: Locale, forceLegacy: Bool = false) -> any AssetManaging {
-        #if os(iOS) && canImport(Speech)
-        if #available(iOS 26, *), !forceLegacy {
-            return IOSAssetManager(locale: locale)
-        } else {
-            return LegacyAssetManager(locale: locale)
-        }
-        #else
-        return NoopAssets()
-        #endif
-    }
-
-    static func makeDefaultAudioInput() -> any AudioInput {
-        #if os(iOS)
-        return MicrophoneInput()
-        #else
-        return NoopMicrophone()
-        #endif
     }
 }

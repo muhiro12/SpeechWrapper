@@ -66,7 +66,7 @@ final class IOSSpeechEngine: TranscriptionEngine {
                 pcm.frameLength = AVAudioFrameCount(frames)
                 bytes.withUnsafeBytes { raw in
                     guard let src = raw.bindMemory(to: Float.self).baseAddress else { return }
-                    pcm.floatChannelData![0].assign(from: src, count: frames)
+                    pcm.floatChannelData![0].update(from: src, count: frames)
                 }
                 builder.yield(AnalyzerInput(buffer: pcm))
             }
@@ -93,33 +93,6 @@ final class IOSSpeechEngine: TranscriptionEngine {
 }
 
 @available(iOS 26, *)
-final class IOSAssetManager: AssetManaging {
-    private let locale: Locale
-
-    init(locale: Locale) { self.locale = locale }
-
-    func ensureAssetsAvailable() async -> Bool {
-        let current = locale
-        let installed = await Set(SpeechTranscriber.installedLocales)
-        return installed.map { $0.identifier(.bcp47) }.contains(current.identifier(.bcp47))
-    }
-
-    func installIfNeeded() async throws -> Bool {
-        let transcriber = SpeechTranscriber(locale: locale,
-                                            transcriptionOptions: [],
-                                            reportingOptions: [],
-                                            attributeOptions: [])
-        if let downloader = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-            try await downloader.downloadAndInstall()
-            return true
-        }
-        return false
-    }
-}
-
-@available(iOS 26, *)
 extension IOSSpeechEngine: @unchecked Sendable {}
-@available(iOS 26, *)
-extension IOSAssetManager: @unchecked Sendable {}
 
 #endif

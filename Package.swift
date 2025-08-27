@@ -11,7 +11,7 @@ let package = Package(
         .library(
             name: "SpeechWrapper",
             targets: ["SpeechWrapper"]
-        ),
+        )
     ],
     targets: [
         .target(
@@ -20,6 +20,6 @@ let package = Package(
         .testTarget(
             name: "SpeechWrapperTests",
             dependencies: ["SpeechWrapper"]
-        ),
+        )
     ]
 )
