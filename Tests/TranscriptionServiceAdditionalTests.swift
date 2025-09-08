@@ -7,49 +7,66 @@ final class ThrowingAudioInput: AudioInput {
     enum Behavior { case ok, throwsOnStart }
     private let behavior: Behavior
     private let stream: AsyncStream<AudioChunk>
-    private let cont: AsyncStream<AudioChunk>.Continuation
+    private let continuation: AsyncStream<AudioChunk>.Continuation
     private(set) var started = false
     private(set) var stopped = false
 
     init(_ behavior: Behavior) {
         self.behavior = behavior
-        var c: AsyncStream<AudioChunk>.Continuation!
-        self.stream = AsyncStream { continuation in c = continuation }
-        self.cont = c
+        var tempContinuation: AsyncStream<AudioChunk>.Continuation!
+        self.stream = AsyncStream { continuation in
+            tempContinuation = continuation
+        }
+        self.continuation = tempContinuation
     }
 
     var chunks: AsyncStream<AudioChunk> { stream }
     func start() async throws {
         started = true
-        if behavior == .throwsOnStart { throw TranscriptionError.audioUnavailable }
+        if behavior == .throwsOnStart {
+            throw TranscriptionError.audioUnavailable
+        }
     }
-    func stop() async { stopped = true; cont.finish() }
+    func stop() async {
+        stopped = true
+        continuation.finish()
+    }
 }
 
 final class ThrowingEngine: TranscriptionEngine {
     enum Behavior { case ok, throwsOnStart }
     private let behavior: Behavior
     private let stream: AsyncStream<TranscriptionResult>
-    private let cont: AsyncStream<TranscriptionResult>.Continuation
+    private let continuation: AsyncStream<TranscriptionResult>.Continuation
     private(set) var started = false
     private(set) var stopped = false
 
     init(_ behavior: Behavior) {
         self.behavior = behavior
-        var c: AsyncStream<TranscriptionResult>.Continuation!
-        self.stream = AsyncStream { cont in c = cont }
-        self.cont = c
+        var tempContinuation: AsyncStream<TranscriptionResult>.Continuation!
+        self.stream = AsyncStream { continuation in
+            tempContinuation = continuation
+        }
+        self.continuation = tempContinuation
     }
 
     var results: AsyncStream<TranscriptionResult> { stream }
     func start(with input: AsyncStream<AudioChunk>) async throws {
         started = true
-        if behavior == .throwsOnStart { throw TranscriptionError.setupFailed }
+        if behavior == .throwsOnStart {
+            throw TranscriptionError.setupFailed
+        }
         // keep input alive until stopped
-        Task { for await _ in input { } }
+        Task {
+            for await _ in input {
+            }
+        }
     }
-    func stop() async { stopped = true; cont.finish() }
-    func emit(_ r: TranscriptionResult) { cont.yield(r) }
+    func stop() async {
+        stopped = true
+        continuation.finish()
+    }
+    func emit(_ result: TranscriptionResult) { continuation.yield(result) }
 }
 
 final class ToggleAssets: AssetManaging {
@@ -61,7 +78,9 @@ final class ToggleAssets: AssetManaging {
     }
     func ensureAssetsAvailable() async -> Bool { available }
     func installIfNeeded() async throws -> Bool {
-        if installSucceeds { available = true }
+        if installSucceeds {
+            available = true
+        }
         return installSucceeds
     }
 }
@@ -121,27 +140,31 @@ extension ToggleAssets: @unchecked Sendable {}
     let service = TranscriptionService(audioInput: input, engine: engine, assets: assets)
 
     // Subscribe before start
-    let s1 = await service.resultStream()
-    let s2 = await service.resultStream()
+    let stream1 = await service.resultStream()
+    let stream2 = await service.resultStream()
     try await service.start()
 
-    let c1 = Task { () -> [TranscriptionResult] in
-        var arr: [TranscriptionResult] = []
-        for await r in s1 { arr.append(r) }
-        return arr
+    let collector1 = Task { () -> [TranscriptionResult] in
+        var resultsArray: [TranscriptionResult] = []
+        for await result in stream1 {
+            resultsArray.append(result)
+        }
+        return resultsArray
     }
-    let c2 = Task { () -> [TranscriptionResult] in
-        var arr: [TranscriptionResult] = []
-        for await r in s2 { arr.append(r) }
-        return arr
+    let collector2 = Task { () -> [TranscriptionResult] in
+        var resultsArray: [TranscriptionResult] = []
+        for await result in stream2 {
+            resultsArray.append(result)
+        }
+        return resultsArray
     }
 
     engine.emit(.init(text: "one", isFinal: false))
     engine.emit(.init(text: "two", isFinal: true))
     await service.stop()
 
-    let a1 = await c1.value
-    let a2 = await c2.value
-    #expect(a1 == [.init(text: "one", isFinal: false), .init(text: "two", isFinal: true)])
-    #expect(a1 == a2)
+    let results1 = await collector1.value
+    let results2 = await collector2.value
+    #expect(results1 == [.init(text: "one", isFinal: false), .init(text: "two", isFinal: true)])
+    #expect(results1 == results2)
 }

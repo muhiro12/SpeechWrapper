@@ -12,23 +12,23 @@ public final actor SpeechClient {
 
     /// Streaming recognition: does not auto-finish on final; finish by stop() or consumer termination.
     public func stream() async throws -> AsyncStream<String> {
-        let svc = TranscriptionService.usingMicrophone(locale: settings.locale,
-                                                       forceLegacy: settings.useLegacy)
-        self.service = svc
-        let source = try await svc.startStreaming()
+        let transcriptionService = TranscriptionService.usingMicrophone(locale: settings.locale,
+                                                                         forceLegacy: settings.useLegacy)
+        self.service = transcriptionService
+        let source = try await transcriptionService.startStreaming()
         return AsyncStream<String> { continuation in
             let task = Task {
-                for await r in source {
+                for await result in source {
                     if self.stopRequested {
                         continuation.finish()
                         break
                     }
-                    continuation.yield(r.text)
+                    continuation.yield(result.text)
                 }
             }
             continuation.onTermination = { _ in
                 task.cancel()
-                Task { await svc.stop() }
+                Task { await transcriptionService.stop() }
             }
         }
     }

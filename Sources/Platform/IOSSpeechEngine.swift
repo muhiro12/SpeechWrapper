@@ -18,9 +18,11 @@ final class IOSSpeechEngine: TranscriptionEngine {
 
     init(locale: Locale) {
         self.locale = locale
-        var c: AsyncStream<TranscriptionResult>.Continuation!
-        self.resultsStream = AsyncStream { cont in c = cont }
-        self.continuation = c
+        var tempContinuation: AsyncStream<TranscriptionResult>.Continuation!
+        self.resultsStream = AsyncStream { continuation in
+            tempContinuation = continuation
+        }
+        self.continuation = tempContinuation
     }
 
     var results: AsyncStream<TranscriptionResult> { resultsStream }
@@ -38,8 +40,10 @@ final class IOSSpeechEngine: TranscriptionEngine {
         self.inputBuilder = pair.continuation
 
         // results forwarding
-        let rTask = Task { [weak self] in
-            guard let self else { return }
+        let resultsTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
             do {
                 for try await result in transcriber.results {
                     let text = result.text
@@ -50,39 +54,51 @@ final class IOSSpeechEngine: TranscriptionEngine {
                 // ignore for now
             }
         }
-        tasks.append(rTask)
+        tasks.append(resultsTask)
 
         // audio feeding: convert Float32 mono samples to AVAudioPCMBuffer
-        let fTask = Task { [weak self] in
-            guard let self, let builder = self.inputBuilder else { return }
+        let feedingTask = Task { [weak self] in
+            guard let self, let builder = self.inputBuilder else {
+                return
+            }
             for await chunk in input {
-                if Task.isCancelled { break }
+                if Task.isCancelled {
+                    break
+                }
                 let bytes = chunk.bytes
                 let frames = bytes.count / MemoryLayout<Float>.size
-                guard frames > 0 else { continue }
+                guard frames > 0 else {
+                    continue
+                }
 
                 let format = AVAudioFormat(standardFormatWithSampleRate: chunk.sampleRate, channels: 1)!
-                guard let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else { continue }
-                pcm.frameLength = AVAudioFrameCount(frames)
-                bytes.withUnsafeBytes { raw in
-                    guard let src = raw.bindMemory(to: Float.self).baseAddress else { return }
-                    pcm.floatChannelData![0].update(from: src, count: frames)
+                guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else {
+                    continue
                 }
-                builder.yield(AnalyzerInput(buffer: pcm))
+                pcmBuffer.frameLength = AVAudioFrameCount(frames)
+                bytes.withUnsafeBytes { raw in
+                    guard let source = raw.bindMemory(to: Float.self).baseAddress else {
+                        return
+                    }
+                    pcmBuffer.floatChannelData![0].update(from: source, count: frames)
+                }
+                builder.yield(AnalyzerInput(buffer: pcmBuffer))
             }
             builder.finish()
         }
-        tasks.append(fTask)
+        tasks.append(feedingTask)
 
-        if let seq = self.inputSequence {
-            try await analyzer?.start(inputSequence: seq)
+        if let sequence = self.inputSequence {
+            try await analyzer?.start(inputSequence: sequence)
         }
     }
 
     func stop() async {
         inputBuilder?.finish()
         try? await analyzer?.finalizeAndFinishThroughEndOfInput()
-        tasks.forEach { $0.cancel() }
+        tasks.forEach {
+            $0.cancel()
+        }
         tasks.removeAll(keepingCapacity: false)
         continuation.finish()
         analyzer = nil

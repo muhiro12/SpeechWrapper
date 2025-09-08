@@ -15,7 +15,7 @@ actor TranscriptionService {
     // Multicast to subscribers
     private var subscribers: [UUID: AsyncStream<TranscriptionResult>.Continuation] = [:]
 
-    /// Initializer using プラットフォーム既定のエンジン/アセット。
+    /// Initializer using platform-default engine/assets.
     init(audioInput: any AudioInput) {
         self.audioInput = audioInput
         self.locale = .current
@@ -38,7 +38,7 @@ actor TranscriptionService {
                                     forceLegacyRequested: forceLegacy)
     }
 
-    /// Internal initializer for DI（ユニットテスト用）。
+    /// Internal initializer for dependency injection (used by unit tests).
     init(audioInput: any AudioInput, engine: any TranscriptionEngine, assets: any AssetManaging) {
         self.audioInput = audioInput
         self.engine = engine
@@ -82,13 +82,21 @@ actor TranscriptionService {
     /// One-shot transcription: Starts, waits for the first final result, then stops.
     /// - Returns: The first final `TranscriptionResult` observed.
     func transcribeOnce() async throws -> TranscriptionResult {
-        if isRunning { throw TranscriptionError.alreadyRunning }
+        if isRunning {
+            throw TranscriptionError.alreadyRunning
+        }
         let stream = resultStream()
         try await start()
-        defer { Task { await self.stop() } }
+        defer {
+            Task {
+                await self.stop()
+            }
+        }
 
-        for await r in stream {
-            if r.isFinal { return r }
+        for await result in stream {
+            if result.isFinal {
+                return result
+            }
         }
         throw TranscriptionError.transcriberFailed
     }
@@ -101,10 +109,14 @@ actor TranscriptionService {
     /// - Returns: true if assets are available after this call.
     @discardableResult
     func prepareAssetsIfNeeded() async -> Bool {
-        if await assets.ensureAssetsAvailable() { return true }
+        if await assets.ensureAssetsAvailable() {
+            return true
+        }
         do {
             let ok = try await assets.installIfNeeded()
-            if !ok { return false }
+            if !ok {
+                return false
+            }
             return await assets.ensureAssetsAvailable()
         } catch {
             return false
@@ -113,7 +125,9 @@ actor TranscriptionService {
 
     /// Start transcription pipeline.
     func start() async throws {
-        if isRunning { throw TranscriptionError.alreadyRunning }
+        if isRunning {
+            throw TranscriptionError.alreadyRunning
+        }
         // Attempt primary engine; if it fails early on iOS 26+ and not forced legacy, try legacy once.
         do {
             try await startPipelineOnce()
@@ -132,21 +146,39 @@ actor TranscriptionService {
     }
 
     private func startPipelineOnce() async throws {
-        guard await prepareAssetsIfNeeded() else { throw TranscriptionError.modelUnavailable }
-        do { try await audioInput.start() } catch { throw TranscriptionError.audioUnavailable }
-        do { try await engine.start(with: audioInput.chunks) } catch { throw TranscriptionError.setupFailed }
+        guard await prepareAssetsIfNeeded() else {
+            throw TranscriptionError.modelUnavailable
+        }
+        do {
+            try await audioInput.start()
+        } catch {
+            throw TranscriptionError.audioUnavailable
+        }
+        do {
+            try await engine.start(with: audioInput.chunks)
+        } catch {
+            throw TranscriptionError.setupFailed
+        }
 
         isRunning = true
         let resultsStream = engine.results
         forwarderTask = Task { [weak self] in
-            guard let self else { return }
-            for await result in resultsStream { await self.broadcast(result) }
+            guard let self else {
+                return
+            }
+            for await result in resultsStream {
+                await self.broadcast(result)
+            }
         }
     }
 
     private func shouldAttemptLegacyFallback(after error: Error) async -> Bool {
-        if didFallbackToLegacy { return false }
-        if forceLegacyRequested { return false }
+        if didFallbackToLegacy {
+            return false
+        }
+        if forceLegacyRequested {
+            return false
+        }
         #if os(iOS)
         if #available(iOS 26, *) {
             // New engine path was selected; allow fallback for setup/asset failures.
@@ -172,7 +204,9 @@ actor TranscriptionService {
 
     /// Stop transcription pipeline and release resources.
     func stop() async {
-        guard isRunning else { return }
+        guard isRunning else {
+            return
+        }
         isRunning = false
         // First, stop engine to naturally end the results stream.
         await engine.stop()
@@ -191,7 +225,9 @@ actor TranscriptionService {
     }
 
     private func finishAll() {
-        for (_, c) in subscribers { c.finish() }
+        for (_, continuation) in subscribers {
+            continuation.finish()
+        }
         subscribers.removeAll(keepingCapacity: false)
     }
 }

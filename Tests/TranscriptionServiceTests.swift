@@ -10,18 +10,22 @@ final class MockAudioInput: AudioInput {
     private(set) var stopped = false
 
     init() {
-        var c: AsyncStream<AudioChunk>.Continuation!
+        var tempContinuation: AsyncStream<AudioChunk>.Continuation!
         self.subject = AsyncStream<AudioChunk> { continuation in
-            continuation.onTermination = { _ in }
-            c = continuation
+            continuation.onTermination = { _ in
+            }
+            tempContinuation = continuation
         }
-        self.continuation = c
+        self.continuation = tempContinuation
     }
 
     var chunks: AsyncStream<AudioChunk> { subject }
 
     func start() async throws { started = true }
-    func stop() async { stopped = true; continuation.finish() }
+    func stop() async {
+        stopped = true
+        continuation.finish()
+    }
 
     func send(_ chunk: AudioChunk) { continuation.yield(chunk) }
     func finish() { continuation.finish() }
@@ -34,19 +38,28 @@ final class MockEngine: TranscriptionEngine {
     private(set) var stopped = false
 
     init() {
-        var c: AsyncStream<TranscriptionResult>.Continuation!
-        self.stream = AsyncStream { continuation in c = continuation }
-        self.continuation = c
+        var tempContinuation: AsyncStream<TranscriptionResult>.Continuation!
+        self.stream = AsyncStream { continuation in
+            tempContinuation = continuation
+        }
+        self.continuation = tempContinuation
     }
 
     var results: AsyncStream<TranscriptionResult> { stream }
 
     func start(with input: AsyncStream<AudioChunk>) async throws {
         started = true
-        Task { for await _ in input { /* ignore */ } }
+        Task {
+            for await _ in input {
+                /* ignore */
+            }
+        }
     }
 
-    func stop() async { stopped = true; continuation.finish() }
+    func stop() async {
+        stopped = true
+        continuation.finish()
+    }
 
     func emit(_ result: TranscriptionResult) { continuation.yield(result) }
     func finish() { continuation.finish() }
@@ -63,8 +76,17 @@ final class MockAssetsManager: AssetManaging {
         self.installSucceeds = installSucceeds
     }
 
-    func ensureAssetsAvailable() async -> Bool { ensureCount += 1; return available }
-    func installIfNeeded() async throws -> Bool { installCount += 1; if installSucceeds { available = true }; return installSucceeds }
+    func ensureAssetsAvailable() async -> Bool {
+        ensureCount += 1
+        return available
+    }
+    func installIfNeeded() async throws -> Bool {
+        installCount += 1
+        if installSucceeds {
+            available = true
+        }
+        return installSucceeds
+    }
 }
 
 extension MockAudioInput: @unchecked Sendable {}
@@ -84,12 +106,14 @@ extension MockAssetsManager: @unchecked Sendable {}
     #expect(input.started)
 
     let collector = Task { () -> [TranscriptionResult] in
-        var arr: [TranscriptionResult] = []
-        for await r in stream {
-            arr.append(r)
-            if arr.count == 2 { break }
+        var resultsArray: [TranscriptionResult] = []
+        for await result in stream {
+            resultsArray.append(result)
+            if resultsArray.count == 2 {
+                break
+            }
         }
-        return arr
+        return resultsArray
     }
 
     engine.emit(.init(text: "hello", isFinal: false))

@@ -5,33 +5,40 @@ final class XCTestAdapterTests: XCTestCase {
 
     // MARK: - Test Doubles (simplified)
     final class MockAudioInput: AudioInput {
-        private let streamImpl: AsyncStream<AudioChunk>
-        private let cont: AsyncStream<AudioChunk>.Continuation
+        private let stream: AsyncStream<AudioChunk>
+        private let continuation: AsyncStream<AudioChunk>.Continuation
         init() {
-            var c: AsyncStream<AudioChunk>.Continuation!
-            self.streamImpl = AsyncStream { cont in c = cont }
-            self.cont = c
+            var tempContinuation: AsyncStream<AudioChunk>.Continuation!
+            self.stream = AsyncStream { continuation in
+                tempContinuation = continuation
+            }
+            self.continuation = tempContinuation
         }
-        var chunks: AsyncStream<AudioChunk> { streamImpl }
+        var chunks: AsyncStream<AudioChunk> { stream }
         func start() async throws {}
-        func stop() async { cont.finish() }
-        func send(_ chunk: AudioChunk) { cont.yield(chunk) }
+        func stop() async { continuation.finish() }
+        func send(_ chunk: AudioChunk) { continuation.yield(chunk) }
     }
 
     final class MockEngine: TranscriptionEngine {
-        private let streamImpl: AsyncStream<TranscriptionResult>
-        private let cont: AsyncStream<TranscriptionResult>.Continuation
+        private let stream: AsyncStream<TranscriptionResult>
+        private let continuation: AsyncStream<TranscriptionResult>.Continuation
         init() {
-            var c: AsyncStream<TranscriptionResult>.Continuation!
-            self.streamImpl = AsyncStream { cont in c = cont }
-            self.cont = c
+            var tempContinuation: AsyncStream<TranscriptionResult>.Continuation!
+            self.stream = AsyncStream { continuation in
+                tempContinuation = continuation
+            }
+            self.continuation = tempContinuation
         }
-        var results: AsyncStream<TranscriptionResult> { streamImpl }
+        var results: AsyncStream<TranscriptionResult> { stream }
         func start(with input: AsyncStream<AudioChunk>) async throws {
-            Task { for await _ in input { } }
+            Task {
+                for await _ in input {
+                }
+            }
         }
-        func stop() async { cont.finish() }
-        func emit(_ r: TranscriptionResult) { cont.yield(r) }
+        func stop() async { continuation.finish() }
+        func emit(_ result: TranscriptionResult) { continuation.yield(result) }
     }
 
     final class MockAssets: AssetManaging {
@@ -64,9 +71,14 @@ final class XCTestAdapterTests: XCTestCase {
         let stream = try await service.startStreaming()
 
         let collector = Task<[TranscriptionResult], Never> {
-            var arr: [TranscriptionResult] = []
-            for await r in stream { arr.append(r); if r.isFinal { break } }
-            return arr
+            var resultsArray: [TranscriptionResult] = []
+            for await result in stream {
+                resultsArray.append(result)
+                if result.isFinal {
+                    break
+                }
+            }
+            return resultsArray
         }
 
         engine.emit(.init(text: "hi", isFinal: false))

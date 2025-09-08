@@ -8,15 +8,19 @@ final class LegacyAssetManager: AssetManaging {
     private let locale: Locale
     init(locale: Locale) { self.locale = locale }
     func ensureAssetsAvailable() async -> Bool {
-        let status = await withCheckedContinuation { (cont: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
-            SFSpeechRecognizer.requestAuthorization { s in cont.resume(returning: s) }
+        let status = await withCheckedContinuation { (continuation: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
+            SFSpeechRecognizer.requestAuthorization { authorizationStatus in
+                continuation.resume(returning: authorizationStatus)
+            }
         }
         return status == .authorized
     }
 
     func installIfNeeded() async throws -> Bool {
-        let status = await withCheckedContinuation { (cont: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
-            SFSpeechRecognizer.requestAuthorization { s in cont.resume(returning: s) }
+        let status = await withCheckedContinuation { (continuation: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
+            SFSpeechRecognizer.requestAuthorization { authorizationStatus in
+                continuation.resume(returning: authorizationStatus)
+            }
         }
         return status == .authorized
     }
